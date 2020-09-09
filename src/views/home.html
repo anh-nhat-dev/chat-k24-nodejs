@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <link rel="stylesheet" type="text/css" href="/static/css/style.css" />
+  </head>
+  <body>
+    <div class="wrapper">
+      <div class="container">
+        <div class="left">
+          <div class="top">
+            <input type="text" placeholder="Search" />
+            <a href="javascript:;" class="search"></a>
+          </div>
+          <ul class="people" id="rooms"></ul>
+        </div>
+        <div class="right" id="chat">
+          <div class="top">
+            <span>To: <span class="name">Dog Woofson</span></span>
+          </div>
+          <div class="chat active-chat"></div>
+          <div class="write">
+            <a href="javascript:;" class="write-link attach"></a>
+            <input type="text" />
+            <a href="javascript:;" class="write-link smiley"></a>
+            <a href="javascript:;" class="write-link send"></a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="/static/js/jquery-3.5.1.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      const socket = io("localhost:3000");
+
+      function login() {
+        const user = prompt("Nhap user");
+
+        if (user) {
+          socket.emit("LOGIN", { username: user });
+        }
+
+        return user;
+      }
+
+      let currentRoomActive, user;
+
+      while (!user) {
+        user = login();
+      }
+
+      socket.on("GET_FULL_NAME", () => {
+        let fullName;
+        while (!fullName) {
+          fullName = prompt("Nhap full Name");
+        }
+
+        socket.emit("SAVE_FULL_NAME", { user, fullName });
+      });
+
+      socket.on("GET_PASSWORD", () => {
+        let pass;
+        while (!pass) {
+          pass = prompt("Nhap password");
+        }
+
+        socket.emit("SAVE_PASSWORD", { user, pass });
+      });
+      socket.on("VER_PASS", () => {
+        let pass;
+        while (!pass) {
+          pass = prompt("Nhap password");
+        }
+
+        socket.emit("VER_PASS", { user, pass });
+      });
+
+      $(document).on("click", "li.person", function () {
+        const self = $(this);
+        const id = self.data("id");
+
+        if (id) {
+          socket.emit("CONNECT_ROOM", { id });
+        }
+      });
+
+      $(".write input").on("keyup", function (e) {
+        if (e.keyCode === 13) {
+          const self = $(this);
+          const value = self.val();
+
+          $("#chat .chat").append(`<div class="bubble me">${value}</div>`);
+          socket.emit("NEW_MESSAGE", {
+            mes: value,
+            roomID: currentRoomActive,
+            id: socket.id,
+          });
+          self.val("");
+        }
+      });
+
+      socket.on("JOIN_ROOM_SUCCESS", (data) => {
+        console.log("data", data);
+        const id = data.room.id;
+        const messages = data.messages;
+
+        $(".person.active").eq(0).removeClass("active");
+        $(`#${id}`).addClass("active");
+
+        $("#chat .chat").empty();
+
+        for (let mess of messages) {
+          const uID = mess.id;
+          if (uID === socket.id) {
+            $("#chat .chat").append(`<div class="bubble me">${mess.mes}</div>`);
+          } else {
+            $("#chat .chat").append(
+              `<div class="bubble you">${mess.mes}</div>`
+            );
+          }
+        }
+
+        currentRoomActive = id;
+      });
+
+      // R_NEW_MESSAGE
+
+      socket.on("R_NEW_MESSAGE", (data) => {
+        const value = data.mes;
+        const roomID = data.roomID;
+        if (roomID === currentRoomActive) {
+          $("#chat .chat").append(`<div class="bubble you">${value}</div>`);
+        }
+      });
+
+      socket.on("R_GET_ROOMS", (data) => {
+        const rooms = data.rooms || [];
+        if (!rooms.length) return;
+
+        for (let room of rooms) {
+          $("#rooms").append(
+            `<li class="person" id="${room.id}" data-id="${room.id}"><span class="name">${room.name}</span></li>`
+          );
+        }
+
+        socket.emit("CONNECT_ROOM", { id: rooms[0].id });
+      });
+    </script>
+  </body>
+</html>
