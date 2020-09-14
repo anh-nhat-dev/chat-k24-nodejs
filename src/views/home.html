@@ -86,6 +86,13 @@
         }
       });
 
+      $(document).on("click", ".chat-user", function () {
+        const self = $(this);
+        const username = self.data("user");
+        console.log("username", username);
+        socket.emit("START_CHAT", { username, currentUser: user });
+      });
+
       $(".write input").on("keyup", function (e) {
         if (e.keyCode === 13) {
           const self = $(this);
@@ -95,29 +102,38 @@
           socket.emit("NEW_MESSAGE", {
             mes: value,
             roomID: currentRoomActive,
-            id: socket.id,
+            user: user,
           });
           self.val("");
         }
       });
 
       socket.on("JOIN_ROOM_SUCCESS", (data) => {
-        console.log("data", data);
         const id = data.room.id;
+        const room = data.room;
         const messages = data.messages;
+
+        if (!$(`#${id}`).length) {
+          $("#rooms").append(
+            `<li class="person" id="${room.id}" data-id="${room.id}"><span class="name">${room.name}</span></li>`
+          );
+        }
 
         $(".person.active").eq(0).removeClass("active");
         $(`#${id}`).addClass("active");
 
         $("#chat .chat").empty();
-
         for (let mess of messages) {
-          const uID = mess.id;
-          if (uID === socket.id) {
+          const uId = mess.user;
+          if (uId === user) {
             $("#chat .chat").append(`<div class="bubble me">${mess.mes}</div>`);
           } else {
             $("#chat .chat").append(
-              `<div class="bubble you">${mess.mes}</div>`
+              `
+              <b class="chat-user" data-user="${mess.user}">${mess.fullName}</b>
+              <div class="bubble you">
+                ${mess.mes}
+                </div>`
             );
           }
         }
@@ -131,7 +147,22 @@
         const value = data.mes;
         const roomID = data.roomID;
         if (roomID === currentRoomActive) {
-          $("#chat .chat").append(`<div class="bubble you">${value}</div>`);
+          $("#chat .chat").append(
+            `<b class="chat-user" data-user="${data.user}">${data.fullName}</b><div class="bubble you">${value}</div>`
+          );
+        }
+
+        console.log($(`#${roomID}`));
+        if (!$(`#${roomID}`).length) {
+          socket.emit("GET_PRIVATE_ROOM_INFO", { user, roomID });
+        }
+      });
+
+      socket.on("R_GET_PRIVATE_ROOM_INFO", (room) => {
+        if (!$(`#${room.id}`).length) {
+          $("#rooms").append(
+            `<li class="person" id="${room.id}" data-id="${room.id}"><span class="name">${room.name}</span></li>`
+          );
         }
       });
 
